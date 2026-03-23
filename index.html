@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIF → Spritesheet</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0d0f12;
+    --surface: #161a20;
+    --border: #2a2f38;
+    --border-hi: #3d4450;
+    --text: #c8cdd5;
+    --text-dim: #6b7280;
+    --accent: #4fc3f7;
+    --accent-dim: #1a3a4a;
+    --green: #66bb6a;
+    --red: #ef5350;
+    --mono: 'JetBrains Mono', monospace;
+  }
+
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--mono);
+    font-size: 15px; min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center; padding: 48px 24px;
+  }
+
+  h1 { font-size: 28px; font-weight: 700; color: var(--accent); margin-bottom: 6px; letter-spacing: -0.5px; }
+  .subtitle { color: var(--text-dim); font-size: 14px; margin-bottom: 32px; max-width: 640px; text-align: center; line-height: 1.7; }
+
+  .drop-zone {
+    width: 100%; max-width: 720px; min-height: 220px;
+    border: 2px dashed var(--border); border-radius: 16px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+    cursor: pointer; transition: all 0.2s; position: relative; background: var(--surface);
+  }
+  .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); background: var(--accent-dim); }
+  .drop-zone .icon { font-size: 48px; opacity: 0.5; }
+  .drop-zone .label { color: var(--text-dim); font-size: 15px; }
+  .drop-zone .label span { color: var(--accent); text-decoration: underline; }
+  .drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+  .panel { width: 100%; max-width: 720px; margin-top: 24px; display: none; }
+
+  .section-title {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--text-dim); margin: 24px 0 12px 2px;
+  }
+  .section-title:first-child { margin-top: 0; }
+
+  .section-title.collapsible {
+    cursor: pointer; user-select: none; display: flex; align-items: center; gap: 8px;
+  }
+  .section-title.collapsible::before {
+    content: ''; display: inline-block; width: 0; height: 0;
+    border-left: 5px solid transparent; border-right: 5px solid transparent;
+    border-top: 6px solid var(--text-dim); transition: transform 0.2s;
+  }
+  .section-title.collapsible.collapsed::before { transform: rotate(-90deg); }
+  .collapsible-content { overflow: hidden; transition: max-height 0.3s ease, opacity 0.2s ease; max-height: 500px; opacity: 1; }
+  .collapsible-content.collapsed { max-height: 0; opacity: 0; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+
+  .ctrl { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .ctrl label {
+    display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--text-dim); margin-bottom: 8px;
+  }
+  .ctrl .val { color: var(--accent); font-weight: 600; float: right; }
+
+  input[type="range"] {
+    width: 100%; -webkit-appearance: none; height: 6px;
+    background: var(--border); border-radius: 3px; outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 18px; height: 18px;
+    background: var(--accent); border-radius: 50%; cursor: pointer;
+  }
+
+  .toggle-row {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px;
+  }
+  .toggle-row label { margin-bottom: 0; flex: 1; font-size: 14px; }
+
+  .toggle { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+  .toggle input { opacity: 0; position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; z-index: 1; margin: 0; }
+  .toggle .slider {
+    position: absolute; inset: 0; background: var(--border); border-radius: 12px; cursor: pointer; transition: 0.2s;
+  }
+  .toggle .slider::before {
+    content: ''; position: absolute; left: 3px; top: 3px;
+    width: 18px; height: 18px; background: var(--text-dim); border-radius: 50%; transition: 0.2s;
+  }
+  .toggle input:checked + .slider { background: var(--accent-dim); }
+  .toggle input:checked + .slider::before { transform: translateX(20px); background: var(--accent); }
+
+  .pill-group { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pill-group button {
+    font-family: var(--mono); font-size: 12px; font-weight: 600;
+    padding: 6px 14px; border: 1px solid var(--border); border-radius: 8px;
+    cursor: pointer; background: transparent; color: var(--text-dim); transition: 0.15s;
+  }
+  .pill-group button:hover { border-color: var(--border-hi); color: var(--text); }
+  .pill-group button.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+  .pill-group button .swatch {
+    display: inline-block; width: 10px; height: 10px; border-radius: 2px;
+    margin-right: 5px; vertical-align: middle; border: 1px solid rgba(255,255,255,0.15);
+  }
+
+  /* Frame picker */
+  .picker-bar {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;
+  }
+  .picker-bar button {
+    font-family: var(--mono); font-size: 12px; font-weight: 600;
+    padding: 6px 14px; border: 1px solid var(--border); border-radius: 8px;
+    cursor: pointer; background: transparent; color: var(--text-dim); transition: 0.15s;
+  }
+  .picker-bar button:hover { border-color: var(--accent); color: var(--accent); }
+  .picker-bar .picker-count { font-size: 13px; color: var(--text-dim); margin-left: auto; }
+  .picker-bar .picker-count b { color: var(--green); }
+
+  .frame-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 6px;
+    max-height: 360px; overflow-y: auto; padding: 6px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  }
+  .frame-thumb {
+    position: relative; cursor: pointer; border-radius: 4px;
+    border: 2px solid transparent; overflow: hidden; transition: 0.15s;
+    aspect-ratio: 1; background: #000;
+  }
+  .frame-thumb canvas {
+    width: 100%; height: 100%; display: block; image-rendering: pixelated;
+    object-fit: contain;
+  }
+  .frame-thumb.selected { border-color: var(--accent); }
+  .frame-thumb.excluded { opacity: 0.25; border-color: transparent; }
+  .frame-thumb .idx {
+    position: absolute; top: 2px; left: 2px; font-size: 10px; font-weight: 700;
+    background: rgba(0,0,0,0.6); color: var(--text); padding: 2px 4px; border-radius: 3px;
+    line-height: 1;
+  }
+  .frame-thumb.excluded .idx { color: var(--red); }
+
+  .actions { width: 100%; max-width: 720px; display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+  button.act {
+    font-family: var(--mono); font-size: 14px; font-weight: 600;
+    padding: 12px 24px; border: 1px solid var(--border); border-radius: 10px;
+    cursor: pointer; background: var(--surface); color: var(--text); transition: all 0.15s;
+  }
+  button.act:hover { border-color: var(--accent); color: var(--accent); }
+  button.act.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  button.act.primary:hover { opacity: 0.85; }
+
+  .stats {
+    width: 100%; max-width: 720px; margin-top: 16px; padding: 12px 16px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    font-size: 13px; color: var(--text-dim); display: none;
+  }
+  .stats b { color: var(--green); font-weight: 600; }
+
+  .preview-section { width: 100%; max-width: 92vw; margin-top: 20px; display: none; }
+  .preview-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .preview-bar label { font-size: 13px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-dim); }
+  .preview-bar .val { color: var(--accent); font-weight: 600; margin-left: 2px; }
+  .preview-bar input[type="range"] { width: 160px; }
+  .preview-bar button {
+    font-family: var(--mono); font-size: 12px; font-weight: 600;
+    padding: 6px 14px; border: 1px solid var(--border); border-radius: 7px;
+    cursor: pointer; background: transparent; color: var(--text-dim); transition: 0.15s;
+  }
+  .preview-bar button:hover { border-color: var(--accent); color: var(--accent); }
+
+  .preview-wrap {
+    width: 100%; overflow: auto;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: repeating-conic-gradient(#1a1d23 0% 25%, #14171c 0% 50%) 0 0 / 20px 20px;
+    max-height: 80vh;
+  }
+  .preview-wrap canvas { display: block; image-rendering: pixelated; transform-origin: top left; }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(60px);
+    background: var(--green); color: var(--bg); font-weight: 600;
+    padding: 12px 28px; border-radius: 10px; font-size: 14px;
+    opacity: 0; transition: all 0.3s ease; pointer-events: none; z-index: 10;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .loading { display: none; color: var(--text-dim); font-size: 14px; margin-top: 14px; }
+  .loading.active { display: block; }
+  @keyframes pulse { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+  .loading span { animation: pulse 1s infinite; }
+
+  .warn { color: #ffa726; font-size: 13px; margin-top: 10px; max-width: 720px; display: none; text-align: center; }
+
+  .sub-ctrls { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+  .sub-ctrls.hidden { display: none; }
+  .sub-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.7px; color: var(--text-dim); margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<h1>GIF → Spritesheet</h1>
+<p class="subtitle">convert animated GIFs into single-image spritesheets for efficient use with AI coding tools like Claude Code — avoid request size limits by turning hundreds of frames into one compact PNG</p>
+
+<div class="drop-zone" id="dropZone">
+  <div class="icon">🎞️</div>
+  <div class="label">drag & drop a .gif or <span>browse</span></div>
+  <input type="file" id="fileInput" accept=".gif,image/gif">
+</div>
+
+<p class="warn" id="warn"></p>
+
+<div class="panel" id="panel">
+
+  <div class="section-title">Layout</div>
+  <div class="grid">
+    <div class="ctrl">
+      <label>Every Nth frame <span class="val" id="sampleVal">1</span></label>
+      <input type="range" id="sampleRate" min="1" max="30" value="1">
+    </div>
+    <div class="ctrl">
+      <label>Columns <span class="val" id="colsVal">6</span></label>
+      <input type="range" id="cols" min="2" max="20" value="6">
+    </div>
+    <div class="ctrl">
+      <label>Scale <span class="val" id="scaleVal">1×</span></label>
+      <input type="range" id="scale" min="1" max="4" value="1" step="0.5">
+    </div>
+    <div class="ctrl">
+      <label>Max frames <span class="val" id="maxVal">all</span></label>
+      <input type="range" id="maxFrames" min="0" max="200" value="0">
+    </div>
+  </div>
+
+  <!-- FRAME PICKER -->
+  <div class="section-title">Frame Picker <span style="font-weight:400; text-transform:none; letter-spacing:0; font-size:11px;">(click to toggle, shift+click for range)</span></div>
+  <div class="picker-bar">
+    <button id="pickerAll">All</button>
+    <button id="pickerNone">None</button>
+    <button id="pickerInvert">Invert</button>
+    <span class="picker-count" id="pickerCount"></span>
+  </div>
+  <div class="frame-grid" id="frameGrid"></div>
+
+  <!-- STYLE OPTIONS (Border + Numbers) -->
+  <div class="section-title collapsible collapsed" id="styleHeader">Style Options</div>
+  <div class="collapsible-content collapsed" id="styleContent">
+    <div class="sub-label">Border</div>
+    <div class="grid">
+      <div class="toggle-row">
+        <label>Show inner border</label>
+        <div class="toggle"><input type="checkbox" id="borderOn"><span class="slider"></span></div>
+      </div>
+      <div class="ctrl">
+        <label>Thickness <span class="val" id="borderThkVal">1</span></label>
+        <input type="range" id="borderThk" min="1" max="4" value="1">
+      </div>
+    </div>
+    <div class="sub-ctrls hidden" id="borderOpts">
+      <div class="sub-label">Border Color</div>
+      <div class="pill-group" id="borderColorPills"></div>
+    </div>
+
+    <div class="sub-label" style="margin-top:16px">Sprite Numbers</div>
+    <div class="grid">
+      <div class="toggle-row">
+        <label>Show frame number</label>
+        <div class="toggle"><input type="checkbox" id="numOn"><span class="slider"></span></div>
+      </div>
+      <div class="ctrl">
+        <label>Font size <span class="val" id="numSizeVal">12</span></label>
+        <input type="range" id="numSize" min="8" max="120" value="12">
+      </div>
+    </div>
+    <div class="sub-ctrls hidden" id="numOpts">
+      <div class="sub-label">Number Color</div>
+      <div class="pill-group" id="numColorPills"></div>
+      <div class="sub-label" style="margin-top:8px">Numbering</div>
+      <div class="pill-group" id="numModePills"></div>
+      <div class="sub-label" style="margin-top:8px">Corner</div>
+      <div class="pill-group" id="numCornerPills"></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="loading" id="loading"><span>⏳ decoding frames...</span></div>
+<div class="stats" id="stats"></div>
+
+<div class="actions" id="actions" style="display:none;">
+  <button class="act primary" id="download">⬇ Download PNG</button>
+  <button class="act" id="copyInfo">📋 Copy Stats</button>
+</div>
+
+<div class="preview-section" id="previewSection">
+  <div class="preview-bar">
+    <label>Preview zoom <span class="val" id="zoomVal">100%</span></label>
+    <input type="range" id="previewZoom" min="5" max="100" value="100">
+    <button id="fitBtn">Fit to window</button>
+  </div>
+  <div class="preview-wrap" id="previewWrap">
+    <canvas id="canvas"></canvas>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+let allFrames = [];      // ImageBitmap[]
+let excluded = new Set(); // indices into allFrames that are manually excluded
+let lastClickedThumb = -1; // for shift-click range selection
+let gifWidth = 0, gifHeight = 0;
+let timer = null;
+
+// --- State ---
+const state = {
+  borderOn: false, borderColor: 'auto', borderThk: 1,
+  numOn: false, numColor: 'auto', numCorner: 'tl', numSize: 12, numMode: 'seq',
+};
+
+const COLOR_OPTIONS = [
+  { id: 'auto',  label: 'Auto',   hex: null },
+  { id: 'black', label: 'Black',  hex: '#000000' },
+  { id: 'white', label: 'White',  hex: '#ffffff' },
+  { id: 'grey',  label: 'Grey',   hex: '#888888' },
+  { id: 'red',   label: 'Red',    hex: '#ff2222' },
+  { id: 'green', label: 'Green',  hex: '#00ff44' },
+];
+
+const CORNERS = [
+  { id: 'tl', label: '↖ TL' }, { id: 'tr', label: '↗ TR' },
+  { id: 'bl', label: '↙ BL' }, { id: 'br', label: '↘ BR' },
+];
+
+const NUM_MODES = [
+  { id: 'seq', label: 'Sequential (0,1,2…)' },
+  { id: 'src', label: 'Source frame index' },
+];
+
+// --- Build pill groups ---
+function buildPills(containerId, options, stateKey, isColor) {
+  const c = $(containerId); c.innerHTML = '';
+  options.forEach(opt => {
+    const btn = document.createElement('button');
+    if (isColor && opt.hex) {
+      btn.innerHTML = `<span class="swatch" style="background:${opt.hex}"></span>${opt.label}`;
+    } else if (isColor && !opt.hex) {
+      btn.innerHTML = `<span class="swatch" style="background:conic-gradient(#f00,#0f0,#00f,#f00)"></span>${opt.label}`;
+    } else {
+      btn.textContent = opt.label;
+    }
+    if (state[stateKey] === opt.id) btn.classList.add('active');
+    btn.onclick = () => {
+      state[stateKey] = opt.id;
+      c.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      debounceRender();
+    };
+    c.appendChild(btn);
+  });
+}
+
+buildPills('borderColorPills', COLOR_OPTIONS, 'borderColor', true);
+buildPills('numColorPills', COLOR_OPTIONS, 'numColor', true);
+buildPills('numModePills', NUM_MODES, 'numMode', false);
+buildPills('numCornerPills', CORNERS, 'numCorner', false);
+
+// --- Toggles ---
+$('borderOn').onchange = function() { state.borderOn = this.checked; $('borderOpts').classList.toggle('hidden', !this.checked); debounceRender(); };
+$('numOn').onchange = function() { state.numOn = this.checked; $('numOpts').classList.toggle('hidden', !this.checked); debounceRender(); };
+
+// --- Elements ---
+const dropZone = $('dropZone'), fileInput = $('fileInput');
+const sampleRate = $('sampleRate'), cols = $('cols'), scaleEl = $('scale'), maxFrames = $('maxFrames');
+const canvas = $('canvas'), ctx = canvas.getContext('2d');
+
+// --- Drag & Drop ---
+['dragenter','dragover'].forEach(e => dropZone.addEventListener(e, ev => { ev.preventDefault(); dropZone.classList.add('dragover'); }));
+['dragleave','drop'].forEach(e => dropZone.addEventListener(e, ev => { ev.preventDefault(); dropZone.classList.remove('dragover'); }));
+dropZone.addEventListener('drop', ev => {
+  const f = ev.dataTransfer.files[0];
+  if (f && (f.type === 'image/gif' || f.name.endsWith('.gif'))) loadGif(f);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadGif(fileInput.files[0]); });
+
+// --- Sliders ---
+sampleRate.oninput = () => { $('sampleVal').textContent = sampleRate.value; rebuildPicker(); debounceRender(); };
+cols.oninput = () => { $('colsVal').textContent = cols.value; debounceRender(); };
+scaleEl.oninput = () => { $('scaleVal').textContent = scaleEl.value + '×'; debounceRender(); };
+maxFrames.oninput = () => { $('maxVal').textContent = maxFrames.value == 0 ? 'all' : maxFrames.value; rebuildPicker(); debounceRender(); };
+$('borderThk').oninput = function() { state.borderThk = parseInt(this.value); $('borderThkVal').textContent = this.value; debounceRender(); };
+$('numSize').oninput = function() { state.numSize = parseInt(this.value); $('numSizeVal').textContent = this.value; debounceRender(); };
+
+function debounceRender() { clearTimeout(timer); timer = setTimeout(() => { if (allFrames.length) renderSheet(); }, 60); }
+
+// ========== FRAME PICKER ==========
+
+function getCandidateIndices() {
+  // Returns the source-frame indices that pass the sampling + max filter (before manual exclusion)
+  const samp = parseInt(sampleRate.value);
+  const maxF = parseInt(maxFrames.value);
+  const indices = [];
+  for (let i = 0; i < allFrames.length; i += samp) indices.push(i);
+  if (maxF > 0 && indices.length > maxF) indices.length = maxF;
+  return indices;
+}
+
+function rebuildPicker() {
+  const grid = $('frameGrid');
+  grid.innerHTML = '';
+  const candidates = getCandidateIndices();
+
+  candidates.forEach((srcIdx, i) => {
+    const thumb = document.createElement('div');
+    thumb.className = 'frame-thumb' + (excluded.has(srcIdx) ? ' excluded' : ' selected');
+    thumb.dataset.srcIdx = srcIdx;
+    thumb.dataset.pos = i;
+
+    // Mini canvas
+    const tc = document.createElement('canvas');
+    tc.width = gifWidth; tc.height = gifHeight;
+    tc.getContext('2d').drawImage(allFrames[srcIdx], 0, 0);
+    thumb.appendChild(tc);
+
+    // Index label
+    const idx = document.createElement('span');
+    idx.className = 'idx';
+    idx.textContent = srcIdx;
+    thumb.appendChild(idx);
+
+    thumb.addEventListener('click', (ev) => onThumbClick(ev, srcIdx, i));
+    grid.appendChild(thumb);
+  });
+
+  updatePickerCount();
+}
+
+function onThumbClick(ev, srcIdx, pos) {
+  if (ev.shiftKey && lastClickedThumb >= 0) {
+    // Range select/deselect between lastClickedThumb and pos
+    const candidates = getCandidateIndices();
+    const lo = Math.min(lastClickedThumb, pos);
+    const hi = Math.max(lastClickedThumb, pos);
+    // Determine action: if the clicked one is currently selected, we exclude the range; otherwise include
+    const willExclude = !excluded.has(srcIdx);
+    for (let i = lo; i <= hi; i++) {
+      if (willExclude) excluded.add(candidates[i]);
+      else excluded.delete(candidates[i]);
+    }
+  } else {
+    if (excluded.has(srcIdx)) excluded.delete(srcIdx);
+    else excluded.add(srcIdx);
+  }
+  lastClickedThumb = pos;
+  syncPickerVisuals();
+  debounceRender();
+}
+
+function syncPickerVisuals() {
+  const grid = $('frameGrid');
+  for (const thumb of grid.children) {
+    const idx = parseInt(thumb.dataset.srcIdx);
+    const isExcl = excluded.has(idx);
+    thumb.classList.toggle('excluded', isExcl);
+    thumb.classList.toggle('selected', !isExcl);
+  }
+  updatePickerCount();
+}
+
+function updatePickerCount() {
+  const candidates = getCandidateIndices();
+  const active = candidates.filter(i => !excluded.has(i)).length;
+  $('pickerCount').innerHTML = `<b>${active}</b> / ${candidates.length} selected`;
+}
+
+$('pickerAll').onclick = () => {
+  const candidates = getCandidateIndices();
+  candidates.forEach(i => excluded.delete(i));
+  syncPickerVisuals(); debounceRender();
+};
+$('pickerNone').onclick = () => {
+  const candidates = getCandidateIndices();
+  candidates.forEach(i => excluded.add(i));
+  syncPickerVisuals(); debounceRender();
+};
+$('pickerInvert').onclick = () => {
+  const candidates = getCandidateIndices();
+  candidates.forEach(i => { if (excluded.has(i)) excluded.delete(i); else excluded.add(i); });
+  syncPickerVisuals(); debounceRender();
+};
+
+// ========== AUTO COLOR ==========
+
+function autoContrastColor(ctx, x, y, w, h) {
+  const sampleSize = 2, pixels = [];
+  try {
+    const topData = ctx.getImageData(x, y, w, sampleSize).data;
+    for (let i = 0; i < topData.length; i += 4) pixels.push([topData[i], topData[i+1], topData[i+2]]);
+    const botData = ctx.getImageData(x, y + h - sampleSize, w, sampleSize).data;
+    for (let i = 0; i < botData.length; i += 4) pixels.push([botData[i], botData[i+1], botData[i+2]]);
+    const leftData = ctx.getImageData(x, y, sampleSize, h).data;
+    for (let i = 0; i < leftData.length; i += 4) pixels.push([leftData[i], leftData[i+1], leftData[i+2]]);
+    const rightData = ctx.getImageData(x + w - sampleSize, y, sampleSize, h).data;
+    for (let i = 0; i < rightData.length; i += 4) pixels.push([rightData[i], rightData[i+1], rightData[i+2]]);
+  } catch(e) { return '#ff2222'; }
+  if (!pixels.length) return '#ff2222';
+  let rS = 0, gS = 0, bS = 0;
+  for (const [r,g,b] of pixels) { rS += r; gS += g; bS += b; }
+  const n = pixels.length, lum = (0.299 * rS/n + 0.587 * gS/n + 0.114 * bS/n) / 255;
+  if (lum > 0.55) return '#000000';
+  if (lum < 0.25) return '#ffffff';
+  const inv = [255 - rS/n, 255 - gS/n, 255 - bS/n], mx = Math.max(...inv);
+  if (mx < 50) return '#ff2222';
+  const boost = inv.map(c => Math.min(255, Math.round(c * 255 / mx)));
+  return `rgb(${boost[0]},${boost[1]},${boost[2]})`;
+}
+
+function resolveColor(colorId, ctx, x, y, w, h) {
+  if (colorId === 'auto') return autoContrastColor(ctx, x, y, w, h);
+  return COLOR_OPTIONS.find(c => c.id === colorId)?.hex || '#ff2222';
+}
+
+// ========== GIF DECODE ==========
+
+async function loadGif(file) {
+  if (typeof ImageDecoder === 'undefined') {
+    $('warn').textContent = '⚠ ImageDecoder not supported. Use Chrome or Edge.';
+    $('warn').style.display = 'block'; return;
+  }
+
+  $('warn').style.display = 'none';
+  $('loading').classList.add('active');
+  $('panel').style.display = 'none';
+  $('actions').style.display = 'none';
+  $('previewSection').style.display = 'none';
+  $('stats').style.display = 'none';
+
+  allFrames.forEach(f => f.close());
+  allFrames = [];
+  excluded.clear();
+  lastClickedThumb = -1;
+
+  try {
+    const decoder = new ImageDecoder({ data: file.stream(), type: 'image/gif' });
+    await decoder.tracks.ready;
+    const track = decoder.tracks.selectedTrack;
+    await decoder.completed;
+
+    const frameCount = track.frameCount;
+    gifWidth = 0; gifHeight = 0;
+    const comp = document.createElement('canvas'); let cCtx;
+
+    for (let i = 0; i < frameCount; i++) {
+      const { image: vf } = await decoder.decode({ frameIndex: i });
+      if (i === 0) {
+        gifWidth = vf.displayWidth; gifHeight = vf.displayHeight;
+        comp.width = gifWidth; comp.height = gifHeight;
+        cCtx = comp.getContext('2d');
+      }
+      cCtx.drawImage(vf, 0, 0); vf.close();
+      allFrames.push(await createImageBitmap(comp));
+    }
+    decoder.close();
+
+    maxFrames.max = allFrames.length;
+    sampleRate.max = Math.max(2, Math.ceil(allFrames.length / 4));
+
+    if (allFrames.length > 60) {
+      sampleRate.value = Math.ceil(allFrames.length / 36);
+      $('sampleVal').textContent = sampleRate.value;
+    } else {
+      sampleRate.value = 1; $('sampleVal').textContent = '1';
+    }
+
+    $('loading').classList.remove('active');
+    $('panel').style.display = 'block';
+    $('actions').style.display = 'flex';
+
+    rebuildPicker();
+    renderSheet();
+    requestAnimationFrame(() => $('fitBtn').click());
+
+  } catch (err) {
+    $('loading').classList.remove('active');
+    $('warn').textContent = '⚠ Decode failed: ' + err.message;
+    $('warn').style.display = 'block'; console.error(err);
+  }
+}
+
+// ========== RENDER ==========
+
+function renderSheet() {
+  const numCols = parseInt(cols.value);
+  const s = parseFloat(scaleEl.value);
+
+  // Get candidates then filter by manual exclusion
+  const candidates = getCandidateIndices();
+  const finalIndices = candidates.filter(i => !excluded.has(i));
+
+  if (!finalIndices.length) {
+    canvas.width = 1; canvas.height = 1;
+    $('stats').innerHTML = '<b>0</b> frames selected';
+    $('stats').style.display = 'block';
+    $('previewSection').style.display = 'block';
+    return;
+  }
+
+  const fw = Math.round(gifWidth * s);
+  const fh = Math.round(gifHeight * s);
+  const rows = Math.ceil(finalIndices.length / numCols);
+
+  canvas.width = fw * numCols;
+  canvas.height = fh * rows;
+  ctx.imageSmoothingEnabled = false;
+
+  // 1) Draw sprites
+  for (let i = 0; i < finalIndices.length; i++) {
+    const cx = (i % numCols) * fw, cy = Math.floor(i / numCols) * fh;
+    ctx.drawImage(allFrames[finalIndices[i]], cx, cy, fw, fh);
+  }
+
+  // 2) Borders
+  if (state.borderOn) {
+    const thk = state.borderThk;
+    for (let i = 0; i < finalIndices.length; i++) {
+      const cx = (i % numCols) * fw, cy = Math.floor(i / numCols) * fh;
+      const color = resolveColor(state.borderColor, ctx, cx, cy, fw, fh);
+      ctx.strokeStyle = color; ctx.lineWidth = thk;
+      const off = thk / 2;
+      ctx.strokeRect(cx + off, cy + off, fw - thk, fh - thk);
+    }
+  }
+
+  // 3) Numbers
+  if (state.numOn) {
+    const fontSize = state.numSize;
+    ctx.font = `bold ${fontSize}px 'JetBrains Mono', monospace`;
+    ctx.textBaseline = 'top';
+
+    for (let i = 0; i < finalIndices.length; i++) {
+      const cx = (i % numCols) * fw, cy = Math.floor(i / numCols) * fh;
+      const color = resolveColor(state.numColor, ctx, cx, cy, fw, fh);
+      const text = state.numMode === 'seq' ? String(i) : String(finalIndices[i]);
+      const tw = ctx.measureText(text).width, th = fontSize;
+      const pad = Math.max(3, Math.round(fontSize * 0.25));
+
+      let tx, ty;
+      switch (state.numCorner) {
+        case 'tl': tx = cx + pad; ty = cy + pad; break;
+        case 'tr': tx = cx + fw - tw - pad; ty = cy + pad; break;
+        case 'bl': tx = cx + pad; ty = cy + fh - th - pad; break;
+        case 'br': tx = cx + fw - tw - pad; ty = cy + fh - th - pad; break;
+      }
+
+      const pp = 2;
+      ctx.fillStyle = color === '#000000' || color === 'rgb(0,0,0)' ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.5)';
+      ctx.fillRect(Math.round(tx - pp), Math.round(ty - pp), Math.round(tw + pp*2), Math.round(th + pp*2));
+      ctx.fillStyle = color;
+      ctx.fillText(text, Math.round(tx), Math.round(ty));
+    }
+  }
+
+  const droppedCount = candidates.length - finalIndices.length;
+  const droppedNote = droppedCount > 0 ? ` · <span style="color:var(--red)">${droppedCount} dropped</span>` : '';
+  $('stats').innerHTML =
+    `<b>${finalIndices.length}</b> frames · <b>${canvas.width}×${canvas.height}</b> px · ` +
+    `source: ${allFrames.length} frames @ ${gifWidth}×${gifHeight}${droppedNote}`;
+  $('stats').style.display = 'block';
+  $('previewSection').style.display = 'block';
+  applyZoom();
+}
+
+// ========== PREVIEW ZOOM ==========
+
+const previewZoom = $('previewZoom');
+
+function applyZoom() {
+  const z = parseInt(previewZoom.value) / 100;
+  canvas.style.width = Math.ceil(canvas.width * z) + 'px';
+  canvas.style.height = Math.ceil(canvas.height * z) + 'px';
+  $('zoomVal').textContent = previewZoom.value + '%';
+}
+
+previewZoom.oninput = applyZoom;
+
+$('fitBtn').onclick = () => {
+  if (!canvas.width) return;
+  const wrapWidth = $('previewWrap').clientWidth || window.innerWidth * 0.9;
+  const pct = Math.min(100, Math.floor((wrapWidth / canvas.width) * 100));
+  previewZoom.value = Math.max(5, pct);
+  applyZoom();
+};
+
+// ========== ACTIONS ==========
+
+$('download').onclick = () => {
+  canvas.toBlob(blob => {
+    if (!blob) { showToast('Export failed'); return; }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'spritesheet.png'; a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+    showToast(`Saved — ${(blob.size / 1024).toFixed(0)} KB`);
+  }, 'image/png');
+};
+
+$('copyInfo').onclick = () => {
+  const candidates = getCandidateIndices();
+  const final = candidates.filter(i => !excluded.has(i));
+  navigator.clipboard.writeText(
+    `Spritesheet: ${final.length} frames, ${canvas.width}×${canvas.height}px, from ${allFrames.length} original @ ${gifWidth}×${gifHeight}`
+  );
+  showToast('Copied to clipboard');
+};
+
+function showToast(msg) {
+  const t = $('toast'); t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// --- Collapsible sections ---
+document.querySelectorAll('.section-title.collapsible').forEach(header => {
+  header.addEventListener('click', () => {
+    header.classList.toggle('collapsed');
+    const content = header.nextElementSibling;
+    if (content && content.classList.contains('collapsible-content')) {
+      content.classList.toggle('collapsed');
+    }
+  });
+});
+</script>
+</body>
+</html>
