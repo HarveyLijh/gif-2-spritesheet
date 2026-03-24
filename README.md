@@ -1,4 +1,4 @@
-# GIF to Spritesheet
+# GIF to Spritesheet for AI Agents
 
 **Convert GIFs into single-image spritesheets — built for sharing AI agent demos with Claude Code, Cursor, and beyond.**
 

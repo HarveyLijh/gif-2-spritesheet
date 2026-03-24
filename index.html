@@ -51,6 +51,7 @@
     color: var(--text-dim); margin: 24px 0 12px 2px;
   }
   .section-title:first-child { margin-top: 0; }
+  .step-num { color: var(--accent); font-weight: 700; }
 
   .section-title.collapsible {
     cursor: pointer; user-select: none; display: flex; align-items: center; gap: 8px;
@@ -212,6 +213,7 @@
 <h1>GIF → Spritesheet</h1>
 <p class="subtitle">convert animated GIFs into single-image spritesheets for efficient use with AI coding tools like Claude Code — avoid request size limits by turning hundreds of frames into one compact PNG</p>
 
+<div class="section-title"><span class="step-num">Step 1</span> — Upload</div>
 <div class="drop-zone" id="dropZone">
   <div class="icon">🎞️</div>
   <div class="label">drag & drop a .gif or <span>browse</span></div>
@@ -222,7 +224,7 @@
 
 <div class="panel" id="panel">
 
-  <div class="section-title">Layout</div>
+  <div class="section-title"><span class="step-num">Step 2</span> — Layout</div>
   <div class="grid">
     <div class="ctrl">
       <label>Every Nth frame <span class="val" id="sampleVal">1</span></label>
@@ -243,7 +245,7 @@
   </div>
 
   <!-- FRAME PICKER -->
-  <div class="section-title">Frame Picker <span style="font-weight:400; text-transform:none; letter-spacing:0; font-size:11px;">(click to toggle, shift+click for range)</span></div>
+  <div class="section-title"><span class="step-num">Step 3</span> — Frame Picker <span style="font-weight:400; text-transform:none; letter-spacing:0; font-size:11px;">(click to toggle, shift+click for range)</span></div>
   <div class="picker-bar">
     <button id="pickerAll">All</button>
     <button id="pickerNone">None</button>
@@ -253,7 +255,7 @@
   <div class="frame-grid" id="frameGrid"></div>
 
   <!-- STYLE OPTIONS (Border + Numbers) -->
-  <div class="section-title collapsible collapsed" id="styleHeader">Style Options</div>
+  <div class="section-title collapsible collapsed" id="styleHeader"><span class="step-num">Step 4</span> — Style Options</div>
   <div class="collapsible-content collapsed" id="styleContent">
     <div class="sub-label">Border</div>
     <div class="grid">
@@ -297,6 +299,7 @@
 <div class="loading" id="loading"><span>⏳ decoding frames...</span></div>
 <div class="stats" id="stats"></div>
 
+<div class="section-title" id="exportTitle" style="display:none; max-width:720px; width:100%;"><span class="step-num">Step 5</span> — Export</div>
 <div class="actions" id="actions" style="display:none;">
   <button class="act primary" id="download">⬇ Download PNG</button>
   <button class="act" id="copyInfo">📋 Copy Stats</button>
@@ -544,6 +547,7 @@ async function loadGif(file) {
   $('loading').classList.add('active');
   $('panel').style.display = 'none';
   $('actions').style.display = 'none';
+  $('exportTitle').style.display = 'none';
   $('previewSection').style.display = 'none';
   $('stats').style.display = 'none';
 
@@ -587,6 +591,7 @@ async function loadGif(file) {
     $('loading').classList.remove('active');
     $('panel').style.display = 'block';
     $('actions').style.display = 'flex';
+    $('exportTitle').style.display = 'block';
 
     rebuildPicker();
     renderSheet();
