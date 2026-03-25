@@ -64,6 +64,29 @@ Screen recordings of AI coding agents (Claude Code, Cursor, Windsurf, etc.) ofte
 - Uses the [ImageDecoder API](https://developer.mozilla.org/en-US/docs/Web/API/ImageDecoder) (Chrome/Edge required)
 - Zero install — just open the page
 
+## Roadmap
+
+- [x] GIF → spritesheet PNG, fully in-browser — no uploads, no server
+- [x] Frame sampling — keep every Nth frame to reduce noise
+- [x] Interactive frame picker — click to include/exclude, shift-click for range selection
+- [x] Max frames cap — limit total output frames
+- [x] Configurable columns (2–20) and scale (1x–4x)
+- [x] Frame number overlay — sequential or source index, any corner, auto-contrast color
+- [x] Border controls — adjustable thickness and color presets
+- [x] Live zoomable preview with fit-to-window
+- [x] One-click PNG download
+- [ ] Video input (`.mp4`, `.webm`, `.mov`) — no GIF conversion step
+- [ ] Animated WebP & APNG input
+- [ ] Auto-dedup — skip visually identical frames automatically
+- [ ] Diff highlight mode — color-code pixels that changed between frames
+- [ ] Per-frame captions and callout arrows (rendered into the PNG)
+- [ ] URL-encoded config sharing + named presets (Claude Code, Cursor, …)
+- [ ] `npx gif2spritesheet` CLI with watch mode
+- [ ] GitHub Action for CI spritesheet generation
+- [ ] `gif2spritesheet` npm library (ESM, browser + Node.js)
+
+See [ROADMAP.md](./ROADMAP.md) for details and motivation behind each item.
+
 ## Contributing
 
 Feature requests are welcome — [open an issue](https://github.com/HarveyLijh/gif-2-spritesheet/issues). Feel free to fork and build on it however you like.
